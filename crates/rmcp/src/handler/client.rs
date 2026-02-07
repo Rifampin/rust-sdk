@@ -1,6 +1,7 @@
 pub mod progress;
 use std::sync::Arc;
 
+#[allow(deprecated)] // model::* includes deprecated roots types (MCP 2025-11-25)
 use crate::{
     error::ErrorData as McpError,
     model::*,
@@ -93,6 +94,12 @@ pub trait ClientHandler: Sized + Send + Sync + 'static {
         ))
     }
 
+    /// List workspace roots.
+    ///
+    /// **DEPRECATED**: Roots removed from MCP spec as of 2025-11-25.
+    /// Use workspace or filesystem tools instead.
+    #[deprecated(since = "0.14.0", note = "Roots removed from MCP spec. Use workspace/filesystem tools.")]
+    #[allow(deprecated)]
     fn list_roots(
         &self,
         context: RequestContext<RoleClient>,

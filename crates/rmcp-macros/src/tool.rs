@@ -199,6 +199,12 @@ pub struct ToolAnnotationsAttribute {
     ///
     /// Default: true
     pub open_world_hint: Option<bool>,
+
+    /// If true, the client should prompt the user for confirmation before
+    /// executing this tool.
+    ///
+    /// Default: false (MCP 2025-11-25)
+    pub requires_confirmation: Option<bool>,
 }
 
 pub fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenStream> {
@@ -240,6 +246,7 @@ pub fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenStream> {
             destructive_hint,
             idempotent_hint,
             open_world_hint,
+            requires_confirmation,
         } = annotations;
         fn wrap_option<T: ToTokens>(x: Option<T>) -> TokenStream {
             x.map(|x| quote! {Some(#x.into())})
@@ -250,6 +257,7 @@ pub fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenStream> {
         let destructive_hint = wrap_option(destructive_hint);
         let idempotent_hint = wrap_option(idempotent_hint);
         let open_world_hint = wrap_option(open_world_hint);
+        let requires_confirmation = wrap_option(requires_confirmation);
         let token_stream = quote! {
             Some(rmcp::model::ToolAnnotations {
                 title: #title,
@@ -257,6 +265,7 @@ pub fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenStream> {
                 destructive_hint: #destructive_hint,
                 idempotent_hint: #idempotent_hint,
                 open_world_hint: #open_world_hint,
+                requires_confirmation: #requires_confirmation,
             })
         };
         syn::parse2::<Expr>(token_stream)?

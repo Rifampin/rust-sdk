@@ -505,7 +505,7 @@
       ]
     },
     "CreateElicitationRequestParams": {
-      "description": "Parameters for creating an elicitation request to gather user input.\n\nThis structure contains everything needed to request interactive input from a user:\n- A human-readable message explaining what information is needed\n- A type-safe schema defining the expected structure of the response\n\n# Example\n\n```rust\nuse rmcp::model::*;\n\nlet params = CreateElicitationRequestParams {\n    meta: None,\n    message: \"Please provide your email\".to_string(),\n    requested_schema: ElicitationSchema::builder()\n        .required_email(\"email\")\n        .build()\n        .unwrap(),\n};\n```",
+      "description": "Parameters for creating an elicitation request to gather user input.\n\nThis structure supports both form mode (in-band) and URL mode (out-of-band)\nelicitation as defined in MCP 2025-11-25.\n\n# Form Mode Example\n\n```rust\nuse rmcp::model::*;\n\nlet params = CreateElicitationRequestParams::form(\n    \"Please provide your email\",\n    ElicitationSchema::builder()\n        .required_email(\"email\")\n        .build()\n        .unwrap(),\n);\n```\n\n# URL Mode Example\n\n```rust\nuse rmcp::model::*;\n\nlet params = CreateElicitationRequestParams::url(\n    \"elicit-12345\",\n    \"https://auth.example.com/connect\",\n    \"Please authenticate to continue\",\n);\n```",
       "type": "object",
       "properties": {
         "_meta": {
@@ -516,22 +516,46 @@
           ],
           "additionalProperties": true
         },
+        "elicitationId": {
+          "description": "Unique identifier for this elicitation request (URL mode only).\nUsed to correlate the elicitation with completion notifications.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "message": {
-          "description": "Human-readable message explaining what input is needed from the user.\nThis should be clear and provide sufficient context for the user to understand\nwhat information they need to provide.",
+          "description": "Human-readable message explaining what input is needed from the user.\nRequired for both form and URL modes.",
           "type": "string"
         },
-        "requestedSchema": {
-          "description": "Type-safe schema defining the expected structure and validation rules for the user's response.\nThis enforces the MCP 2025-06-18 specification that elicitation schemas must be objects\nwith primitive-typed properties.",
+        "mode": {
+          "description": "Elicitation mode: \"form\" (default) or \"url\".\nOmitting defaults to form mode for backwards compatibility.",
           "allOf": [
             {
-              "$ref": "#/definitions/ElicitationSchema"
+              "$ref": "#/definitions/ElicitationMode"
             }
+          ]
+        },
+        "requestedSchema": {
+          "description": "Type-safe schema defining the expected structure and validation rules for the user's response.\nRequired for form mode, ignored for URL mode.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ElicitationSchema"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "description": "URL to direct the user to for out-of-band data collection (URL mode only).\nMUST be HTTPS. Server MUST NOT include sensitive user info in URL.",
+          "type": [
+            "string",
+            "null"
           ]
         }
       },
       "required": [
-        "message",
-        "requestedSchema"
+        "message"
       ]
     },
     "CreateElicitationResult": {
@@ -547,7 +571,7 @@
           ]
         },
         "content": {
-          "description": "The actual data provided by the user, if they accepted the request.\nMust conform to the JSON schema specified in the original request.\nOnly present when action is Accept."
+          "description": "The actual data provided by the user, if they accepted the request.\nMust conform to the JSON schema specified in the original request.\nOnly present when action is Accept in form mode.\nOmitted in URL mode (data was collected out-of-band)."
         }
       },
       "required": [
@@ -713,6 +737,21 @@
       "type": "string",
       "format": "const",
       "const": "elicitation/create"
+    },
+    "ElicitationMode": {
+      "description": "Mode of elicitation request (MCP 2025-11-25).\n\nElicitation supports two modes:\n- **Form**: In-band data collection where data passes through the MCP client\n- **URL**: Out-of-band data collection where user is directed to an external URL",
+      "oneOf": [
+        {
+          "description": "Form mode: data is collected in-band through the MCP client.\nUse for non-sensitive information.",
+          "type": "string",
+          "const": "form"
+        },
+        {
+          "description": "URL mode: user is directed to an external URL for data collection.\nUse for sensitive operations (OAuth, payments, API keys).",
+          "type": "string",
+          "const": "url"
+        }
+      ]
     },
     "ElicitationSchema": {
       "description": "Type-safe elicitation schema for requesting structured user input.\n\nThis enforces the MCP 2025-06-18 specification that elicitation schemas\nmust be objects with primitive-typed properties.\n\n# Example\n\n```rust\nuse rmcp::model::*;\n\nlet schema = ElicitationSchema::builder()\n    .required_email(\"email\")\n    .required_integer(\"age\", 0, 150)\n    .optional_bool(\"newsletter\", false)\n    .build();\n```",
@@ -2891,6 +2930,13 @@
         },
         "readOnlyHint": {
           "description": "If true, the tool does not modify its environment.\n\nDefault: false",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "requiresConfirmation": {
+          "description": "If true, the client should prompt the user for confirmation before\nexecuting this tool.\n\nThis is useful for tools that perform sensitive operations (e.g.,\ndeleting files, sending emails, making payments) where the user\nshould explicitly approve each invocation.\n\nDefault: false (MCP 2025-11-25)",
           "type": [
             "boolean",
             "null"

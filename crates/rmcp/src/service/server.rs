@@ -7,6 +7,7 @@ use super::*;
 use crate::model::{
     CreateElicitationRequest, CreateElicitationRequestParams, CreateElicitationResult,
 };
+#[allow(deprecated)] // ListRootsRequest/ListRootsResult are deprecated (MCP 2025-11-25)
 use crate::{
     model::{
         CancelledNotification, CancelledNotificationParam, ClientInfo, ClientJsonRpcMessage,
@@ -400,6 +401,7 @@ impl Peer<RoleServer> {
             _ => Err(ServiceError::UnexpectedResponse),
         }
     }
+    #[allow(deprecated)]
     method!(peer_req list_roots ListRootsRequest() => ListRootsResult);
     #[cfg(feature = "elicitation")]
     method!(peer_req create_elicitation CreateElicitationRequest(CreateElicitationRequestParams) => CreateElicitationResult);
@@ -690,11 +692,7 @@ impl Peer<RoleServer> {
 
         let response = self
             .create_elicitation_with_timeout(
-                CreateElicitationRequestParams {
-                    meta: None,
-                    message: message.into(),
-                    requested_schema: schema,
-                },
+                CreateElicitationRequestParams::form(message, schema),
                 timeout,
             )
             .await?;

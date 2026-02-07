@@ -297,6 +297,7 @@
           }
         },
         "roots": {
+          "description": "**DEPRECATED**: Roots removed from MCP spec as of 2025-11-25.",
           "anyOf": [
             {
               "$ref": "#/definitions/RootsCapabilities"
@@ -304,7 +305,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "deprecated": true
         },
         "sampling": {
           "type": [
@@ -412,7 +414,7 @@
           ]
         },
         "content": {
-          "description": "The actual data provided by the user, if they accepted the request.\nMust conform to the JSON schema specified in the original request.\nOnly present when action is Accept."
+          "description": "The actual data provided by the user, if they accepted the request.\nMust conform to the JSON schema specified in the original request.\nOnly present when action is Accept in form mode.\nOmitted in URL mode (data was collected out-of-band)."
         }
       },
       "required": [
@@ -507,17 +509,58 @@
       ]
     },
     "ElicitationCapability": {
-      "description": "Capability for handling elicitation requests from servers.\n\nElicitation allows servers to request interactive input from users during tool execution.\nThis capability indicates that a client can handle elicitation requests and present\nappropriate UI to users for collecting the requested information.",
+      "description": "Capability for handling elicitation requests from servers (MCP 2025-11-25).\n\nElicitation allows servers to request interactive input from users during tool execution.\nThis capability indicates that a client can handle elicitation requests and present\nappropriate UI to users for collecting the requested information.\n\nSupports two modes:\n- **Form mode**: In-band data collection through the MCP client\n- **URL mode**: Out-of-band data collection via external URL (for sensitive data)",
       "type": "object",
       "properties": {
+        "form": {
+          "description": "Form mode capability settings.\nPresence indicates support for in-band form-based elicitation.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FormElicitationCapability"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "schemaValidation": {
-          "description": "Whether the client supports JSON Schema validation for elicitation responses.\nWhen true, the client will validate user input against the requested_schema\nbefore sending the response back to the server.",
+          "description": "DEPRECATED: Use `form` instead.\nWhether the client supports JSON Schema validation for elicitation responses.",
           "type": [
             "boolean",
             "null"
+          ],
+          "deprecated": true
+        },
+        "url": {
+          "description": "URL mode capability settings.\nPresence indicates support for out-of-band URL-based elicitation.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/UrlElicitationCapability"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       }
+    },
+    "ElicitationCompleteNotificationMethod": {
+      "type": "string",
+      "format": "const",
+      "const": "notifications/elicitation/complete"
+    },
+    "ElicitationCompleteNotificationParams": {
+      "description": "Parameters for elicitation complete notification (URL mode).\n\nSent by servers to notify clients when a URL mode elicitation flow completes.",
+      "type": "object",
+      "properties": {
+        "elicitationId": {
+          "description": "The elicitation ID that was completed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "elicitationId"
+      ]
     },
     "EmptyObject": {
       "description": "This is commonly used for representing empty objects in MCP messages.\n\nwithout returning any specific data.",
@@ -553,6 +596,19 @@
         "code",
         "message"
       ]
+    },
+    "FormElicitationCapability": {
+      "description": "Form mode elicitation capability settings.",
+      "type": "object",
+      "properties": {
+        "schemaValidation": {
+          "description": "Whether the client validates form input against the requested schema.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
     },
     "GetPromptRequestMethod": {
       "type": "string",
@@ -793,6 +849,9 @@
           "$ref": "#/definitions/NotificationNoParam2"
         },
         {
+          "$ref": "#/definitions/Notification3"
+        },
+        {
           "$ref": "#/definitions/CustomNotification"
         }
       ],
@@ -911,6 +970,7 @@
       "const": "resources/list"
     },
     "ListRootsResult": {
+      "description": "Result of listing workspace roots.\n\n**DEPRECATED**: Roots removed from MCP spec as of 2025-11-25.",
       "type": "object",
       "properties": {
         "roots": {
@@ -920,6 +980,7 @@
           }
         }
       },
+      "deprecated": true,
       "required": [
         "roots"
       ]
@@ -971,6 +1032,21 @@
         },
         "params": {
           "$ref": "#/definitions/ProgressNotificationParam"
+        }
+      },
+      "required": [
+        "method",
+        "params"
+      ]
+    },
+    "Notification3": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "$ref": "#/definitions/ElicitationCompleteNotificationMethod"
+        },
+        "params": {
+          "$ref": "#/definitions/ElicitationCompleteNotificationParams"
         }
       },
       "required": [
@@ -1686,6 +1762,7 @@
       ]
     },
     "Root": {
+      "description": "A root directory in the workspace.\n\n**DEPRECATED**: Roots removed from MCP spec as of 2025-11-25.\nUse workspace or filesystem tools instead.",
       "type": "object",
       "properties": {
         "name": {
@@ -1698,11 +1775,13 @@
           "type": "string"
         }
       },
+      "deprecated": true,
       "required": [
         "uri"
       ]
     },
     "RootsCapabilities": {
+      "description": "Roots capability negotiation.\n\n**DEPRECATED**: Roots have been removed from the MCP specification as of 2025-11-25.\nUse workspace or filesystem tools instead.",
       "type": "object",
       "properties": {
         "listChanged": {
@@ -1711,7 +1790,8 @@
             "null"
           ]
         }
-      }
+      },
+      "deprecated": true
     },
     "RootsListChangedNotificationMethod": {
       "type": "string",
@@ -1829,6 +1909,10 @@
       "required": [
         "uri"
       ]
+    },
+    "UrlElicitationCapability": {
+      "description": "URL mode elicitation capability settings.",
+      "type": "object"
     }
   }
 }

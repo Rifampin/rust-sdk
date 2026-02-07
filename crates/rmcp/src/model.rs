@@ -151,11 +151,13 @@ impl std::fmt::Display for ProtocolVersion {
 }
 
 impl ProtocolVersion {
+    /// MCP 2025-11-25: Tasks, URL mode elicitation, requiresConfirmation annotations
+    pub const V_2025_11_25: Self = Self(Cow::Borrowed("2025-11-25"));
     pub const V_2025_06_18: Self = Self(Cow::Borrowed("2025-06-18"));
     pub const V_2025_03_26: Self = Self(Cow::Borrowed("2025-03-26"));
     pub const V_2024_11_05: Self = Self(Cow::Borrowed("2024-11-05"));
-    //  Keep LATEST at 2025-03-26 until full 2025-06-18 compliance and automated testing are in place.
-    pub const LATEST: Self = Self::V_2025_03_26;
+    /// Latest protocol version with full compliance
+    pub const LATEST: Self = Self::V_2025_11_25;
 }
 
 impl Serialize for ProtocolVersion {
@@ -178,6 +180,7 @@ impl<'de> Deserialize<'de> for ProtocolVersion {
             "2024-11-05" => return Ok(ProtocolVersion::V_2024_11_05),
             "2025-03-26" => return Ok(ProtocolVersion::V_2025_03_26),
             "2025-06-18" => return Ok(ProtocolVersion::V_2025_06_18),
+            "2025-11-25" => return Ok(ProtocolVersion::V_2025_11_25),
             _ => {}
         }
         Ok(ProtocolVersion(Cow::Owned(s)))
@@ -1580,9 +1583,18 @@ pub struct ArgumentInfo {
 }
 
 // =============================================================================
-// ROOTS AND WORKSPACE MANAGEMENT
+// ROOTS AND WORKSPACE MANAGEMENT (DEPRECATED)
 // =============================================================================
+//
+// NOTE: Roots have been removed from the MCP specification as of 2025-11-25.
+// These types are retained for backward compatibility but should not be used
+// in new code. Use workspace or filesystem tools instead.
 
+/// A root directory in the workspace.
+///
+/// **DEPRECATED**: Roots removed from MCP spec as of 2025-11-25.
+/// Use workspace or filesystem tools instead.
+#[deprecated(since = "0.14.0", note = "Roots removed from MCP spec. Use workspace/filesystem tools.")]
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Root {
@@ -1592,16 +1604,32 @@ pub struct Root {
 }
 
 const_string!(ListRootsRequestMethod = "roots/list");
+
+/// Request to list workspace roots.
+///
+/// **DEPRECATED**: Roots removed from MCP spec as of 2025-11-25.
+#[deprecated(since = "0.14.0", note = "Roots removed from MCP spec. Use workspace/filesystem tools.")]
+#[allow(deprecated)]
 pub type ListRootsRequest = RequestNoParam<ListRootsRequestMethod>;
 
+/// Result of listing workspace roots.
+///
+/// **DEPRECATED**: Roots removed from MCP spec as of 2025-11-25.
+#[deprecated(since = "0.14.0", note = "Roots removed from MCP spec. Use workspace/filesystem tools.")]
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ListRootsResult {
+    #[allow(deprecated)]
     pub roots: Vec<Root>,
 }
 
 const_string!(RootsListChangedNotificationMethod = "notifications/roots/list_changed");
+
+/// Notification that the list of roots has changed.
+///
+/// **DEPRECATED**: Roots removed from MCP spec as of 2025-11-25.
+#[deprecated(since = "0.14.0", note = "Roots removed from MCP spec. Use workspace/filesystem tools.")]
 pub type RootsListChangedNotification = NotificationNoParam<RootsListChangedNotificationMethod>;
 
 // =============================================================================
@@ -1612,6 +1640,7 @@ pub type RootsListChangedNotification = NotificationNoParam<RootsListChangedNoti
 // Elicitation allows servers to request interactive input from users during tool execution.
 const_string!(ElicitationCreateRequestMethod = "elicitation/create");
 const_string!(ElicitationResponseNotificationMethod = "notifications/elicitation/response");
+const_string!(ElicitationCompleteNotificationMethod = "notifications/elicitation/complete");
 
 /// Represents the possible actions a user can take in response to an elicitation request.
 ///
@@ -1631,25 +1660,53 @@ pub enum ElicitationAction {
     Cancel,
 }
 
+/// Mode of elicitation request (MCP 2025-11-25).
+///
+/// Elicitation supports two modes:
+/// - **Form**: In-band data collection where data passes through the MCP client
+/// - **URL**: Out-of-band data collection where user is directed to an external URL
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum ElicitationMode {
+    /// Form mode: data is collected in-band through the MCP client.
+    /// Use for non-sensitive information.
+    #[default]
+    Form,
+    /// URL mode: user is directed to an external URL for data collection.
+    /// Use for sensitive operations (OAuth, payments, API keys).
+    Url,
+}
+
 /// Parameters for creating an elicitation request to gather user input.
 ///
-/// This structure contains everything needed to request interactive input from a user:
-/// - A human-readable message explaining what information is needed
-/// - A type-safe schema defining the expected structure of the response
+/// This structure supports both form mode (in-band) and URL mode (out-of-band)
+/// elicitation as defined in MCP 2025-11-25.
 ///
-/// # Example
+/// # Form Mode Example
 ///
 /// ```rust
 /// use rmcp::model::*;
 ///
-/// let params = CreateElicitationRequestParams {
-///     meta: None,
-///     message: "Please provide your email".to_string(),
-///     requested_schema: ElicitationSchema::builder()
+/// let params = CreateElicitationRequestParams::form(
+///     "Please provide your email",
+///     ElicitationSchema::builder()
 ///         .required_email("email")
 ///         .build()
 ///         .unwrap(),
-/// };
+/// );
+/// ```
+///
+/// # URL Mode Example
+///
+/// ```rust
+/// use rmcp::model::*;
+///
+/// let params = CreateElicitationRequestParams::url(
+///     "elicit-12345",
+///     "https://auth.example.com/connect",
+///     "Please authenticate to continue",
+/// );
 /// ```
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -1659,15 +1716,79 @@ pub struct CreateElicitationRequestParams {
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<Meta>,
 
+    /// Elicitation mode: "form" (default) or "url".
+    /// Omitting defaults to form mode for backwards compatibility.
+    #[serde(default, skip_serializing_if = "is_default_mode")]
+    pub mode: ElicitationMode,
+
     /// Human-readable message explaining what input is needed from the user.
-    /// This should be clear and provide sufficient context for the user to understand
-    /// what information they need to provide.
+    /// Required for both form and URL modes.
     pub message: String,
 
     /// Type-safe schema defining the expected structure and validation rules for the user's response.
-    /// This enforces the MCP 2025-06-18 specification that elicitation schemas must be objects
-    /// with primitive-typed properties.
-    pub requested_schema: ElicitationSchema,
+    /// Required for form mode, ignored for URL mode.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requested_schema: Option<ElicitationSchema>,
+
+    /// Unique identifier for this elicitation request (URL mode only).
+    /// Used to correlate the elicitation with completion notifications.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub elicitation_id: Option<String>,
+
+    /// URL to direct the user to for out-of-band data collection (URL mode only).
+    /// MUST be HTTPS. Server MUST NOT include sensitive user info in URL.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+fn is_default_mode(mode: &ElicitationMode) -> bool {
+    *mode == ElicitationMode::Form
+}
+
+impl CreateElicitationRequestParams {
+    /// Create a form mode elicitation request (in-band data collection).
+    ///
+    /// Use this for non-sensitive information collection.
+    pub fn form<M: Into<String>>(message: M, schema: ElicitationSchema) -> Self {
+        Self {
+            meta: None,
+            mode: ElicitationMode::Form,
+            message: message.into(),
+            requested_schema: Some(schema),
+            elicitation_id: None,
+            url: None,
+        }
+    }
+
+    /// Create a URL mode elicitation request (out-of-band data collection).
+    ///
+    /// Use this for sensitive operations like OAuth, payments, or API key entry.
+    /// The data will NOT pass through the MCP client.
+    pub fn url<I, U, M>(elicitation_id: I, url: U, message: M) -> Self
+    where
+        I: Into<String>,
+        U: Into<String>,
+        M: Into<String>,
+    {
+        Self {
+            meta: None,
+            mode: ElicitationMode::Url,
+            message: message.into(),
+            requested_schema: None,
+            elicitation_id: Some(elicitation_id.into()),
+            url: Some(url.into()),
+        }
+    }
+
+    /// Check if this is a form mode elicitation
+    pub fn is_form_mode(&self) -> bool {
+        self.mode == ElicitationMode::Form
+    }
+
+    /// Check if this is a URL mode elicitation
+    pub fn is_url_mode(&self) -> bool {
+        self.mode == ElicitationMode::Url
+    }
 }
 
 impl RequestParamsMeta for CreateElicitationRequestParams {
@@ -1696,7 +1817,8 @@ pub struct CreateElicitationResult {
 
     /// The actual data provided by the user, if they accepted the request.
     /// Must conform to the JSON schema specified in the original request.
-    /// Only present when action is Accept.
+    /// Only present when action is Accept in form mode.
+    /// Omitted in URL mode (data was collected out-of-band).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<Value>,
 }
@@ -1704,6 +1826,21 @@ pub struct CreateElicitationResult {
 /// Request type for creating an elicitation to gather user input
 pub type CreateElicitationRequest =
     Request<ElicitationCreateRequestMethod, CreateElicitationRequestParams>;
+
+/// Parameters for elicitation complete notification (URL mode).
+///
+/// Sent by servers to notify clients when a URL mode elicitation flow completes.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct ElicitationCompleteNotificationParams {
+    /// The elicitation ID that was completed
+    pub elicitation_id: String,
+}
+
+/// Notification sent when a URL mode elicitation completes
+pub type ElicitationCompleteNotification =
+    Notification<ElicitationCompleteNotificationMethod, ElicitationCompleteNotificationParams>;
 
 // =============================================================================
 // TOOL EXECUTION RESULTS
@@ -2161,15 +2298,18 @@ impl ClientRequest {
     }
 }
 
+#[allow(deprecated)]
 ts_union!(
     export type ClientNotification =
     | CancelledNotification
     | ProgressNotification
     | InitializedNotification
     | RootsListChangedNotification
+    | ElicitationCompleteNotification
     | CustomNotification;
 );
 
+#[allow(deprecated)]
 ts_union!(
     export type ClientResult =
     box CreateMessageResult
@@ -2187,6 +2327,7 @@ impl ClientResult {
 
 pub type ClientJsonRpcMessage = JsonRpcMessage<ClientRequest, ClientResult, ClientNotification>;
 
+#[allow(deprecated)]
 ts_union!(
     export type ServerRequest =
     | PingRequest
@@ -2599,7 +2740,12 @@ mod tests {
     fn test_protocol_version_order() {
         let v1 = ProtocolVersion::V_2024_11_05;
         let v2 = ProtocolVersion::V_2025_03_26;
+        let v3 = ProtocolVersion::V_2025_06_18;
+        let v4 = ProtocolVersion::V_2025_11_25;
         assert!(v1 < v2);
+        assert!(v2 < v3);
+        assert!(v3 < v4);
+        assert_eq!(ProtocolVersion::LATEST, v4);
     }
 
     #[test]

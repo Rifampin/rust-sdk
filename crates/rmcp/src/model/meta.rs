@@ -175,6 +175,7 @@ variant_extension! {
         ProgressNotification
         InitializedNotification
         RootsListChangedNotification
+        ElicitationCompleteNotification
         CustomNotification
     }
 }

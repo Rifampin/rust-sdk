@@ -44,11 +44,10 @@ async fn test_elicitation_request_param_serialization() {
         .build()
         .unwrap();
 
-    let request_param = CreateElicitationRequestParams {
-        meta: None,
-        message: "Please provide your email address".to_string(),
-        requested_schema: schema,
-    };
+    let request_param = CreateElicitationRequestParams::form(
+        "Please provide your email address",
+        schema,
+    );
 
     // Test serialization
     let json = serde_json::to_value(&request_param).unwrap();
@@ -129,11 +128,10 @@ async fn test_elicitation_json_rpc_protocol() {
         id: RequestId::Number(1),
         request: CreateElicitationRequest {
             method: ElicitationCreateRequestMethod,
-            params: CreateElicitationRequestParams {
-                meta: None,
-                message: "Do you want to continue?".to_string(),
-                requested_schema: schema,
-            },
+            params: CreateElicitationRequestParams::form(
+                "Do you want to continue?",
+                schema,
+            ),
             extensions: Default::default(),
         },
     };
@@ -214,24 +212,22 @@ async fn test_elicitation_spec_compliance() {
 #[tokio::test]
 async fn test_elicitation_error_handling() {
     // Test minimal schema handling (empty properties is technically valid)
-    let minimal_schema_request = CreateElicitationRequestParams {
-        meta: None,
-        message: "Test message".to_string(),
-        requested_schema: ElicitationSchema::builder().build().unwrap(),
-    };
+    let minimal_schema_request = CreateElicitationRequestParams::form(
+        "Test message",
+        ElicitationSchema::builder().build().unwrap(),
+    );
 
     // Should serialize without error
     let _json = serde_json::to_value(&minimal_schema_request).unwrap();
 
     // Test empty message
-    let empty_message_request = CreateElicitationRequestParams {
-        meta: None,
-        message: "".to_string(),
-        requested_schema: ElicitationSchema::builder()
+    let empty_message_request = CreateElicitationRequestParams::form(
+        "",
+        ElicitationSchema::builder()
             .property("value", PrimitiveSchema::String(StringSchema::new()))
             .build()
             .unwrap(),
-    };
+    );
 
     // Should serialize without error (validation is up to the implementation)
     let _json = serde_json::to_value(&empty_message_request).unwrap();
@@ -250,11 +246,10 @@ async fn test_elicitation_performance() {
         .build()
         .unwrap();
 
-    let request = CreateElicitationRequestParams {
-        meta: None,
-        message: "Performance test message".to_string(),
-        requested_schema: schema,
-    };
+    let request = CreateElicitationRequestParams::form(
+        "Performance test message",
+        schema,
+    );
 
     let start = std::time::Instant::now();
 
@@ -375,10 +370,9 @@ async fn test_elicitation_convenience_methods() {
     );
 
     // Test that CreateElicitationRequestParams can be created with type-safe schemas
-    let confirmation_request = CreateElicitationRequestParams {
-        meta: None,
-        message: "Test confirmation".to_string(),
-        requested_schema: ElicitationSchema::builder()
+    let confirmation_request = CreateElicitationRequestParams::form(
+        "Test confirmation",
+        ElicitationSchema::builder()
             .property(
                 "confirmed",
                 PrimitiveSchema::Boolean(
@@ -388,7 +382,7 @@ async fn test_elicitation_convenience_methods() {
             )
             .build()
             .unwrap(),
-    };
+    );
 
     // Test serialization of convenience method request
     let json = serde_json::to_value(&confirmation_request).unwrap();
@@ -418,45 +412,25 @@ async fn test_elicitation_structured_schemas() {
         .build()
         .unwrap();
 
-    let request = CreateElicitationRequestParams {
-        meta: None,
-        message: "Please provide your user information".to_string(),
-        requested_schema: schema,
-    };
+    let request = CreateElicitationRequestParams::form(
+        "Please provide your user information",
+        schema,
+    );
 
     // Test that complex schemas serialize/deserialize correctly
     let json = serde_json::to_value(&request).unwrap();
     let deserialized: CreateElicitationRequestParams = serde_json::from_value(json).unwrap();
 
     assert_eq!(deserialized.message, "Please provide your user information");
-    assert_eq!(deserialized.requested_schema.properties.len(), 5);
-    assert!(
-        deserialized
-            .requested_schema
-            .properties
-            .contains_key("name")
-    );
-    assert!(
-        deserialized
-            .requested_schema
-            .properties
-            .contains_key("email")
-    );
-    assert!(deserialized.requested_schema.properties.contains_key("age"));
-    assert!(
-        deserialized
-            .requested_schema
-            .properties
-            .contains_key("newsletter")
-    );
-    assert!(
-        deserialized
-            .requested_schema
-            .properties
-            .contains_key("country")
-    );
+    let schema = deserialized.requested_schema.as_ref().unwrap();
+    assert_eq!(schema.properties.len(), 5);
+    assert!(schema.properties.contains_key("name"));
+    assert!(schema.properties.contains_key("email"));
+    assert!(schema.properties.contains_key("age"));
+    assert!(schema.properties.contains_key("newsletter"));
+    assert!(schema.properties.contains_key("country"));
     assert_eq!(
-        deserialized.requested_schema.required,
+        schema.required,
         Some(vec![
             "name".to_string(),
             "email".to_string(),
@@ -661,43 +635,30 @@ async fn test_elicitation_multi_select_enum() {
         .build()
         .unwrap();
 
-    let request = CreateElicitationRequestParams {
-        meta: None,
-        message: "Please provide your user information".to_string(),
-        requested_schema: schema,
-    };
+    let request = CreateElicitationRequestParams::form(
+        "Please provide your user information",
+        schema,
+    );
 
     // Test that complex schemas serialize/deserialize correctly
     let json = serde_json::to_value(&request).unwrap();
     let deserialized: CreateElicitationRequestParams = serde_json::from_value(json).unwrap();
 
     assert_eq!(deserialized.message, "Please provide your user information");
-    assert_eq!(deserialized.requested_schema.properties.len(), 1);
-    assert!(
-        deserialized
-            .requested_schema
-            .properties
-            .contains_key("choices")
-    );
-    assert_eq!(
-        deserialized.requested_schema.required,
-        Some(vec!["choices".to_string()])
-    );
+    let schema = deserialized.requested_schema.as_ref().unwrap();
+    assert_eq!(schema.properties.len(), 1);
+    assert!(schema.properties.contains_key("choices"));
+    assert_eq!(schema.required, Some(vec!["choices".to_string()]));
 
     assert!(matches!(
-        deserialized
-            .requested_schema
-            .properties
-            .get("choices")
-            .unwrap(),
+        schema.properties.get("choices").unwrap(),
         PrimitiveSchema::Enum(EnumSchema::Multi(_))
     ));
 
-    if let Some(PrimitiveSchema::Enum(schema)) =
-        deserialized.requested_schema.properties.get("choices")
+    if let Some(PrimitiveSchema::Enum(choice_schema)) = schema.properties.get("choices")
     {
         assert_eq!(
-            schema,
+            choice_schema,
             &EnumSchema::Multi(MultiSelectEnumSchema::Titled(TitledMultiSelectEnumSchema {
                 type_: ArrayTypeConst,
                 title: None,
@@ -743,41 +704,27 @@ async fn test_elicitation_single_select_enum() {
         .build()
         .unwrap();
 
-    let request = CreateElicitationRequestParams {
-        meta: None,
-        message: "Please provide your user information".to_string(),
-        requested_schema: schema,
-    };
+    let request = CreateElicitationRequestParams::form(
+        "Please provide your user information",
+        schema,
+    );
 
     // Test that complex schemas serialize/deserialize correctly
     let json = serde_json::to_value(&request).unwrap();
     let deserialized: CreateElicitationRequestParams = serde_json::from_value(json).unwrap();
     assert_eq!(deserialized.message, "Please provide your user information");
-    assert_eq!(deserialized.requested_schema.properties.len(), 1);
-    assert!(
-        deserialized
-            .requested_schema
-            .properties
-            .contains_key("choices")
-    );
-    assert_eq!(
-        deserialized.requested_schema.required,
-        Some(vec!["choices".to_string()])
-    );
+    let schema = deserialized.requested_schema.as_ref().unwrap();
+    assert_eq!(schema.properties.len(), 1);
+    assert!(schema.properties.contains_key("choices"));
+    assert_eq!(schema.required, Some(vec!["choices".to_string()]));
     assert!(matches!(
-        deserialized
-            .requested_schema
-            .properties
-            .get("choices")
-            .unwrap(),
+        schema.properties.get("choices").unwrap(),
         PrimitiveSchema::Enum(EnumSchema::Single(_))
     ));
 
-    if let Some(PrimitiveSchema::Enum(schema)) =
-        deserialized.requested_schema.properties.get("choices")
-    {
+    if let Some(PrimitiveSchema::Enum(choice_schema)) = schema.properties.get("choices") {
         assert_eq!(
-            schema,
+            choice_schema,
             &EnumSchema::Single(SingleSelectEnumSchema::Titled(
                 TitledSingleSelectEnumSchema {
                     type_: StringTypeConst,
@@ -825,11 +772,10 @@ async fn test_elicitation_direction_server_to_client() {
         .build()
         .unwrap();
 
-    let elicitation_request = CreateElicitationRequestParams {
-        meta: None,
-        message: "Please enter your name".to_string(),
-        requested_schema: schema,
-    };
+    let elicitation_request = CreateElicitationRequestParams::form(
+        "Please enter your name",
+        schema,
+    );
 
     // Verify request can be serialized
     let serialized = serde_json::to_value(&elicitation_request).unwrap();
@@ -878,11 +824,10 @@ async fn test_elicitation_json_rpc_direction() {
     let server_request = ServerJsonRpcMessage::request(
         ServerRequest::CreateElicitationRequest(CreateElicitationRequest {
             method: ElicitationCreateRequestMethod,
-            params: CreateElicitationRequestParams {
-                meta: None,
-                message: "Do you want to continue?".to_string(),
-                requested_schema: schema,
-            },
+            params: CreateElicitationRequestParams::form(
+                "Do you want to continue?",
+                schema,
+            ),
             extensions: Default::default(),
         }),
         RequestId::Number(1),
@@ -979,64 +924,73 @@ async fn test_elicitation_result_in_client_result() {
 // ELICITATION CAPABILITIES TESTS
 // =============================================================================
 
-/// Test ElicitationCapability structure and serialization
+/// Test ElicitationCapability structure and serialization (MCP 2025-11-25)
 #[tokio::test]
 async fn test_elicitation_capability_structure() {
-    // Test default ElicitationCapability
+    // Test default ElicitationCapability (no modes enabled)
     let default_cap = ElicitationCapability::default();
-    assert!(default_cap.schema_validation.is_none());
+    assert!(!default_cap.supports_form());
+    assert!(!default_cap.supports_url());
 
-    // Test ElicitationCapability with schema validation enabled
-    let cap_with_validation = ElicitationCapability {
-        schema_validation: Some(true),
-    };
-    assert_eq!(cap_with_validation.schema_validation, Some(true));
+    // Test form-only capability
+    let form_cap = ElicitationCapability::form_only();
+    assert!(form_cap.supports_form());
+    assert!(!form_cap.supports_url());
 
-    // Test ElicitationCapability with schema validation disabled
-    let cap_without_validation = ElicitationCapability {
-        schema_validation: Some(false),
-    };
-    assert_eq!(cap_without_validation.schema_validation, Some(false));
+    // Test URL-only capability
+    let url_cap = ElicitationCapability::url_only();
+    assert!(!url_cap.supports_form());
+    assert!(url_cap.supports_url());
 
-    // Test JSON serialization
-    let json = serde_json::to_value(&cap_with_validation).unwrap();
+    // Test both modes capability
+    let both_cap = ElicitationCapability::both();
+    assert!(both_cap.supports_form());
+    assert!(both_cap.supports_url());
+
+    // Test JSON serialization - form mode only
+    let json = serde_json::to_value(&form_cap).unwrap();
     assert_eq!(
         json,
         serde_json::json!({
-            "schemaValidation": true
+            "form": {}
+        })
+    );
+
+    // Test JSON serialization - both modes
+    let json = serde_json::to_value(&both_cap).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "form": {},
+            "url": {}
         })
     );
 
     // Test JSON deserialization
-    let deserialized: ElicitationCapability = serde_json::from_value(json).unwrap();
-    assert_eq!(deserialized.schema_validation, Some(true));
+    let deserialized: ElicitationCapability =
+        serde_json::from_value(serde_json::json!({"form": {}, "url": {}})).unwrap();
+    assert!(deserialized.supports_form());
+    assert!(deserialized.supports_url());
 }
 
-/// Test ClientCapabilities with elicitation capability
+/// Test ClientCapabilities with elicitation capability (MCP 2025-11-25)
 #[tokio::test]
 async fn test_client_capabilities_with_elicitation() {
-    // Test ClientCapabilities with elicitation capability
+    // Test ClientCapabilities with form+url elicitation capability
     let capabilities = ClientCapabilities {
-        elicitation: Some(ElicitationCapability {
-            schema_validation: Some(true),
-        }),
+        elicitation: Some(ElicitationCapability::both()),
         ..Default::default()
     };
 
-    // Verify elicitation capability is present
+    // Verify elicitation capability is present with both modes
     assert!(capabilities.elicitation.is_some());
-    assert_eq!(
-        capabilities.elicitation.as_ref().unwrap().schema_validation,
-        Some(true)
-    );
+    assert!(capabilities.elicitation.as_ref().unwrap().supports_form());
+    assert!(capabilities.elicitation.as_ref().unwrap().supports_url());
 
     // Test JSON serialization
     let json = serde_json::to_value(&capabilities).unwrap();
-    assert!(
-        json["elicitation"]["schemaValidation"]
-            .as_bool()
-            .unwrap_or(false)
-    );
+    assert!(json["elicitation"]["form"].is_object());
+    assert!(json["elicitation"]["url"].is_object());
 
     // Test ClientCapabilities without elicitation
     let capabilities_without = ClientCapabilities {
@@ -1047,17 +1001,15 @@ async fn test_client_capabilities_with_elicitation() {
     assert!(capabilities_without.elicitation.is_none());
 }
 
-/// Test InitializeRequestParam with elicitation capability
+/// Test InitializeRequestParam with elicitation capability (MCP 2025-11-25)
 #[tokio::test]
 async fn test_initialize_request_with_elicitation() {
-    // Test InitializeRequestParams with elicitation capability
+    // Test InitializeRequestParams with elicitation capability (both modes)
     let init_param = InitializeRequestParams {
         meta: None,
         protocol_version: ProtocolVersion::LATEST,
         capabilities: ClientCapabilities {
-            elicitation: Some(ElicitationCapability {
-                schema_validation: Some(true),
-            }),
+            elicitation: Some(ElicitationCapability::both()),
             ..Default::default()
         },
         client_info: Implementation {
@@ -1071,38 +1023,27 @@ async fn test_initialize_request_with_elicitation() {
 
     // Verify the structure
     assert!(init_param.capabilities.elicitation.is_some());
-    assert_eq!(
-        init_param
-            .capabilities
-            .elicitation
-            .as_ref()
-            .unwrap()
-            .schema_validation,
-        Some(true)
-    );
+    let elicitation = init_param.capabilities.elicitation.as_ref().unwrap();
+    assert!(elicitation.supports_form());
+    assert!(elicitation.supports_url());
 
     // Test JSON serialization
     let json = serde_json::to_value(&init_param).unwrap();
-    assert!(
-        json["capabilities"]["elicitation"]["schemaValidation"]
-            .as_bool()
-            .unwrap_or(false)
-    );
+    assert!(json["capabilities"]["elicitation"]["form"].is_object());
+    assert!(json["capabilities"]["elicitation"]["url"].is_object());
 }
 
-/// Test capability checking logic (simulated)
+/// Test capability checking logic (simulated) - MCP 2025-11-25
 #[tokio::test]
 async fn test_capability_checking_logic() {
     // Simulate the logic that would be used in supports_elicitation()
 
-    // Case 1: Client with elicitation capability
-    let client_with_capability = InitializeRequestParams {
+    // Case 1: Client with elicitation capability (form only)
+    let client_form_only = InitializeRequestParams {
         meta: None,
         protocol_version: ProtocolVersion::LATEST,
         capabilities: ClientCapabilities {
-            elicitation: Some(ElicitationCapability {
-                schema_validation: Some(true),
-            }),
+            elicitation: Some(ElicitationCapability::form_only()),
             ..Default::default()
         },
         client_info: Implementation {
@@ -1115,10 +1056,31 @@ async fn test_capability_checking_logic() {
     };
 
     // Simulate supports_elicitation() logic
-    let supports_elicitation = client_with_capability.capabilities.elicitation.is_some();
-    assert!(supports_elicitation);
+    let elicit = client_form_only.capabilities.elicitation.as_ref().unwrap();
+    assert!(elicit.supports_form());
+    assert!(!elicit.supports_url());
 
-    // Case 2: Client without elicitation capability
+    // Case 2: Client with URL mode only
+    let client_url_only = InitializeRequestParams {
+        meta: None,
+        protocol_version: ProtocolVersion::LATEST,
+        capabilities: ClientCapabilities {
+            elicitation: Some(ElicitationCapability::url_only()),
+            ..Default::default()
+        },
+        client_info: Implementation {
+            name: "test-client".to_string(),
+            version: "1.0.0".to_string(),
+            title: None,
+            website_url: None,
+            icons: None,
+        },
+    };
+    let elicit = client_url_only.capabilities.elicitation.as_ref().unwrap();
+    assert!(!elicit.supports_form());
+    assert!(elicit.supports_url());
+
+    // Case 3: Client without elicitation capability
     let client_without_capability = InitializeRequestParams {
         meta: None,
         protocol_version: ProtocolVersion::LATEST,
@@ -1134,8 +1096,7 @@ async fn test_capability_checking_logic() {
             icons: None,
         },
     };
-    let supports_elicitation = client_without_capability.capabilities.elicitation.is_some();
-    assert!(!supports_elicitation);
+    assert!(client_without_capability.capabilities.elicitation.is_none());
 }
 
 /// Test CapabilityNotSupported error message formatting
@@ -1216,84 +1177,89 @@ async fn test_elicitation_error_variants() {
     }
 }
 
-/// Test ElicitationCapability serialization with schema validation
+/// Test ElicitationCapability serialization (MCP 2025-11-25 modes)
 #[tokio::test]
 async fn test_elicitation_capability_serialization() {
     use rmcp::model::ElicitationCapability;
 
-    // Test default capability (no schema validation)
+    // Test default capability (no modes enabled)
     let default_cap = ElicitationCapability::default();
     let json = serde_json::to_value(&default_cap).unwrap();
 
-    // Should serialize to empty object when no fields are set
+    // Should serialize to empty object when no modes are set
     assert_eq!(json, serde_json::json!({}));
 
-    // Test capability with schema validation enabled
-    let cap_with_validation = ElicitationCapability {
-        schema_validation: Some(true),
-    };
-    let json = serde_json::to_value(&cap_with_validation).unwrap();
+    // Test capability with form mode only
+    let form_cap = ElicitationCapability::form_only();
+    let json = serde_json::to_value(&form_cap).unwrap();
 
     assert_eq!(
         json,
         serde_json::json!({
-            "schemaValidation": true
+            "form": {}
         })
     );
 
-    // Test capability with schema validation disabled
-    let cap_without_validation = ElicitationCapability {
-        schema_validation: Some(false),
-    };
-    let json = serde_json::to_value(&cap_without_validation).unwrap();
+    // Test capability with URL mode only
+    let url_cap = ElicitationCapability::url_only();
+    let json = serde_json::to_value(&url_cap).unwrap();
 
     assert_eq!(
         json,
         serde_json::json!({
-            "schemaValidation": false
+            "url": {}
+        })
+    );
+
+    // Test capability with both modes
+    let both_cap = ElicitationCapability::both();
+    let json = serde_json::to_value(&both_cap).unwrap();
+
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "form": {},
+            "url": {}
         })
     );
 
     // Test deserialization
     let deserialized: ElicitationCapability = serde_json::from_value(serde_json::json!({
-        "schemaValidation": true
+        "form": {},
+        "url": {}
     }))
     .unwrap();
 
-    assert_eq!(deserialized.schema_validation, Some(true));
+    assert!(deserialized.supports_form());
+    assert!(deserialized.supports_url());
 }
 
-/// Test ClientCapabilities builder with elicitation capability methods
+/// Test ClientCapabilities builder with elicitation capability methods (MCP 2025-11-25)
 #[tokio::test]
 async fn test_client_capabilities_elicitation_builder() {
     use rmcp::model::{ClientCapabilities, ElicitationCapability};
 
-    // Test enabling elicitation capability
-    let caps = ClientCapabilities::builder().enable_elicitation().build();
-
-    assert!(caps.elicitation.is_some());
-    assert_eq!(caps.elicitation.as_ref().unwrap().schema_validation, None);
-
-    // Test enabling elicitation with schema validation
-    let caps_with_validation = ClientCapabilities::builder()
-        .enable_elicitation()
-        .enable_elicitation_schema_validation()
+    // Test enabling elicitation capability with form mode only
+    let caps = ClientCapabilities::builder()
+        .enable_elicitation_form_only()
         .build();
 
-    assert!(caps_with_validation.elicitation.is_some());
-    assert_eq!(
-        caps_with_validation
-            .elicitation
-            .as_ref()
-            .unwrap()
-            .schema_validation,
-        Some(true)
-    );
+    assert!(caps.elicitation.is_some());
+    let elicit = caps.elicitation.as_ref().unwrap();
+    assert!(elicit.supports_form());
+    assert!(!elicit.supports_url());
+
+    // Test enabling elicitation with both modes
+    let caps_both = ClientCapabilities::builder()
+        .enable_elicitation_both()
+        .build();
+
+    assert!(caps_both.elicitation.is_some());
+    assert!(caps_both.elicitation.as_ref().unwrap().supports_form());
+    assert!(caps_both.elicitation.as_ref().unwrap().supports_url());
 
     // Test enabling elicitation with custom capability
-    let custom_elicitation = ElicitationCapability {
-        schema_validation: Some(false),
-    };
+    let custom_elicitation = ElicitationCapability::url_only();
 
     let caps_custom = ClientCapabilities::builder()
         .enable_elicitation_with(custom_elicitation.clone())
@@ -1304,6 +1270,8 @@ async fn test_client_capabilities_elicitation_builder() {
         caps_custom.elicitation.as_ref().unwrap(),
         &custom_elicitation
     );
+    assert!(!caps_custom.elicitation.as_ref().unwrap().supports_form());
+    assert!(caps_custom.elicitation.as_ref().unwrap().supports_url());
 }
 
 // =============================================================================
@@ -1322,11 +1290,10 @@ async fn test_create_elicitation_with_timeout_basic() {
         .build()
         .unwrap();
 
-    let _params = CreateElicitationRequestParams {
-        meta: None,
-        message: "Enter your details".to_string(),
-        requested_schema: schema,
-    };
+    let _params = CreateElicitationRequestParams::form(
+        "Enter your details",
+        schema,
+    );
 
     // Test different timeout values
     let timeout_short = Duration::from_millis(100);

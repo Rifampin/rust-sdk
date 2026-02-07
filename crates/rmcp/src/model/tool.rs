@@ -86,6 +86,17 @@ pub struct ToolAnnotations {
     /// Default: true
     #[serde(skip_serializing_if = "Option::is_none")]
     pub open_world_hint: Option<bool>,
+
+    /// If true, the client should prompt the user for confirmation before
+    /// executing this tool.
+    ///
+    /// This is useful for tools that perform sensitive operations (e.g.,
+    /// deleting files, sending emails, making payments) where the user
+    /// should explicitly approve each invocation.
+    ///
+    /// Default: false (MCP 2025-11-25)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requires_confirmation: Option<bool>,
 }
 
 impl ToolAnnotations {
@@ -122,6 +133,16 @@ impl ToolAnnotations {
     pub fn open_world(self, open_world: bool) -> Self {
         ToolAnnotations {
             open_world_hint: Some(open_world),
+            ..self
+        }
+    }
+    /// Set whether this tool requires user confirmation before execution.
+    ///
+    /// This is useful for tools that perform sensitive operations where the
+    /// user should explicitly approve each invocation.
+    pub fn requires_confirmation(self, requires: bool) -> Self {
+        ToolAnnotations {
+            requires_confirmation: Some(requires),
             ..self
         }
     }

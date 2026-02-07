@@ -3,12 +3,14 @@ use std::borrow::Cow;
 use thiserror::Error;
 
 use super::*;
+#[allow(deprecated)] // RootsListChangedNotification is deprecated (MCP 2025-11-25)
 use crate::{
     model::{
         ArgumentInfo, CallToolRequest, CallToolRequestParams, CallToolResult,
         CancelledNotification, CancelledNotificationParam, ClientInfo, ClientJsonRpcMessage,
         ClientNotification, ClientRequest, ClientResult, CompleteRequest, CompleteRequestParams,
-        CompleteResult, CompletionContext, CompletionInfo, ErrorData, GetPromptRequest,
+        CompleteResult, CompletionContext, CompletionInfo, ElicitationCompleteNotification,
+        ElicitationCompleteNotificationParams, ErrorData, GetPromptRequest,
         GetPromptRequestParams, GetPromptResult, InitializeRequest, InitializedNotification,
         JsonRpcResponse, ListPromptsRequest, ListPromptsResult, ListResourceTemplatesRequest,
         ListResourceTemplatesResult, ListResourcesRequest, ListResourcesResult, ListToolsRequest,
@@ -365,7 +367,13 @@ impl Peer<RoleClient> {
     method!(peer_not notify_cancelled CancelledNotification(CancelledNotificationParam));
     method!(peer_not notify_progress ProgressNotification(ProgressNotificationParam));
     method!(peer_not notify_initialized InitializedNotification);
+    #[allow(deprecated)]
     method!(peer_not notify_roots_list_changed RootsListChangedNotification);
+    /// Notify the server that a URL mode elicitation has been completed.
+    ///
+    /// This is used when the client has completed a URL mode elicitation form
+    /// and wants to notify the server so it can retrieve the results.
+    method!(peer_not notify_elicitation_complete ElicitationCompleteNotification(ElicitationCompleteNotificationParams));
 }
 
 impl Peer<RoleClient> {

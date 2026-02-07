@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+#[allow(deprecated)] // model::* includes deprecated roots types (MCP 2025-11-25)
 use crate::{
     error::ErrorData as McpError,
     model::*,
@@ -118,8 +119,12 @@ impl<H: ServerHandler> Service<RoleServer> for H {
             ClientNotification::InitializedNotification(_notification) => {
                 self.on_initialized(context).await
             }
+            #[allow(deprecated)]
             ClientNotification::RootsListChangedNotification(_notification) => {
                 self.on_roots_list_changed(context).await
+            }
+            ClientNotification::ElicitationCompleteNotification(notification) => {
+                self.on_elicitation_complete(notification.params, context).await
             }
             ClientNotification::CustomNotification(notification) => {
                 self.on_custom_notification(notification, context).await
@@ -276,12 +281,32 @@ pub trait ServerHandler: Sized + Send + Sync + 'static {
         tracing::info!("client initialized");
         std::future::ready(())
     }
+    /// Handle notification that roots have changed.
+    ///
+    /// **DEPRECATED**: Roots removed from MCP spec as of 2025-11-25.
+    /// Use workspace or filesystem tools instead.
+    #[deprecated(since = "0.14.0", note = "Roots removed from MCP spec. Use workspace/filesystem tools.")]
     fn on_roots_list_changed(
         &self,
         context: NotificationContext<RoleServer>,
     ) -> impl Future<Output = ()> + Send + '_ {
         std::future::ready(())
     }
+
+    /// Handle notification that a URL mode elicitation has been completed.
+    ///
+    /// This is called when the client has completed a URL mode elicitation form.
+    /// The server should retrieve the elicitation results using the provided
+    /// elicitation ID.
+    fn on_elicitation_complete(
+        &self,
+        params: ElicitationCompleteNotificationParams,
+        context: NotificationContext<RoleServer>,
+    ) -> impl Future<Output = ()> + Send + '_ {
+        let _ = (params, context);
+        std::future::ready(())
+    }
+
     fn on_custom_notification(
         &self,
         notification: CustomNotification,
@@ -481,6 +506,14 @@ macro_rules! impl_server_handler_for_wrapper {
                 context: NotificationContext<RoleServer>,
             ) -> impl Future<Output = ()> + Send + '_ {
                 (**self).on_roots_list_changed(context)
+            }
+
+            fn on_elicitation_complete(
+                &self,
+                params: ElicitationCompleteNotificationParams,
+                context: NotificationContext<RoleServer>,
+            ) -> impl Future<Output = ()> + Send + '_ {
+                (**self).on_elicitation_complete(params, context)
             }
 
             fn on_custom_notification(
